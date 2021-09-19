@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 
 #define round_up(x, y) ((x + (y - 1)) & ~(y - 1))
@@ -14,10 +15,32 @@ struct ctx {
 	u32 pos, len;
 };
 
+int parse_u32(struct ctx *ctx, u32 *out)
+{
+	if (ctx->pos + sizeof(*out) > ctx->len)
+		return -EINVAL;
+
+	memcpy(out, ctx->blob + ctx->pos, sizeof(*out));
+	ctx->pos += sizeof(*out);
+	return 0;
+}
+
 int parse_obj(struct ctx *ctx)
 {
+	int ret;
+	u32 tag;
+
 	/* Align to 32-bits */
 	ctx->pos = round_up(ctx->pos, 4);
+
+	ret = parse_u32(ctx, &tag);
+	if (ret)
+		return ret;
+
+	printf("Tag: %X\n", tag);
+
+	return 0;
+}
 
 int parse(void *blob, size_t size)
 {
@@ -27,16 +50,15 @@ int parse(void *blob, size_t size)
 		.pos = 0,
 	};
 
-	u32 *header = ctx.blob + ctx.pos;
+	int ret;
+	u32 header;
 
-	/* Parse the header */
-	if (ctx.pos + sizeof(*header) > ctx.len)
+	ret = parse_u32(&ctx, &header);
+	if (ret)
+		return ret;
+
+	if (header != OSSERIALIZE_HDR)
 		return -EINVAL;
-
-	if (*header != OSSERIALIZE_HDR)
-		return -EINVAL;
-
-	ctx.pos += sizeof(*header);
 
 	parse_obj(&ctx);
 
