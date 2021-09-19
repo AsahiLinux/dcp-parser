@@ -168,12 +168,12 @@ bool parse_bool(struct ctx *handle)
 }
 
 struct iterator {
-	struct ctx handle;
+	struct ctx *handle;
 	u32 idx;
 	u32 len;
 };
 
-int iterator_begin(struct ctx handle, struct iterator *it, bool dictionary)
+int iterator_begin(struct ctx *handle, struct iterator *it, bool dictionary)
 {
 	struct os_tag *tag;
 	enum os_otype type = dictionary ? OS_OTYPE_DICTIONARY : OS_OTYPE_ARRAY;
@@ -183,7 +183,7 @@ int iterator_begin(struct ctx handle, struct iterator *it, bool dictionary)
 		.idx = 0
 	};
 
-	tag = parse_tag_type(&it->handle, type);
+	tag = parse_tag_type(it->handle, type);
 	if (IS_ERR(tag))
 		return PTR_ERR(tag);
 
@@ -221,12 +221,12 @@ void print_spaces(int indent) {
 	while(spaces--) putchar(' ');
 }
 
-struct ctx print_dict(struct ctx handle, int indent);
-struct ctx print_array(struct ctx handle, int indent);
+int print_dict(struct ctx *handle, int indent);
+int print_array(struct ctx *handle, int indent);
 
-struct ctx print_value(struct ctx handle, int indent)
+int print_value(struct ctx *handle, int indent)
 {
-	switch (peek_type(handle)) {
+	switch (peek_type(*handle)) {
 	case OS_OTYPE_DICTIONARY:
 		return print_dict(handle, indent);
 
@@ -235,106 +235,111 @@ struct ctx print_value(struct ctx handle, int indent)
 
 	case OS_OTYPE_STRING:
 	{
-		char *val = parse_string(&handle);
+		char *val = parse_string(handle);
 		if (IS_ERR(val))
-			return handle;
+			return PTR_ERR(val);
 
 		printf("\"%s\"", val);
 		free(val);
-		return handle;
+		return 0;
 	}
 
 	case OS_OTYPE_BOOL:
 	{
-		bool b = parse_bool(&handle);
+		bool b = parse_bool(handle);
 		printf("%s", b ? "true" : "false");
-		return handle;
+		return 0; // TODO error
 	}
 
 	case OS_OTYPE_INT64:
 	{
-		const s64 *v = parse_int64(&handle);
+		const s64 *v = parse_int64(handle);
 		if (IS_ERR(v))
-			return handle;
+			return PTR_ERR(v);
 		printf("%ld", *v);
-		return handle;
+		return 0;
 	}
 
 	case OS_OTYPE_BLOB:
 	{
-		skip(&handle);
+		skip(handle);
 		printf("<blob>");
-		return handle;
+		return 0;
 	}
 
 	default:
-		WARN_ON(true);
-		return handle;
+		return -EINVAL;
 	}
 }
 
-struct ctx print_dict(struct ctx handle, int indent)
+int print_dict(struct ctx *handle, int indent)
 {
+	int ret;
 	struct iterator it;
 
 	printf("{\n");
 	foreach_in_dict(handle, it) {
-		char *key = parse_string(&it.handle);
+		char *key = parse_string(it.handle);
 		if (IS_ERR(key))
-			return handle;
+			return PTR_ERR(key);
 
 		print_spaces(indent + 1);
 		printf("\"%s\": ", key);
 		free(key);
 
-		it.handle = print_value(it.handle, indent + 1);
-		printf(",\n");
+		ret = print_value(it.handle, indent + 1);
+		if (ret)
+			return ret;
 	}
 
 	print_spaces(indent);
 	printf("}");
-	return it.handle;
+	return 0;
 }
 
-struct ctx print_array(struct ctx handle, int indent)
+int print_array(struct ctx *handle, int indent)
 {
+	int ret;
 	struct iterator it;
 
 	printf("[\n");
 	foreach_in_array(handle, it) {
 		print_spaces(indent + 1);
-		it.handle = print_value(it.handle, indent + 1);
+
+		ret = print_value(it.handle, indent + 1);
+		if (ret)
+			return ret;
+
 		printf(",\n");
 	}
 
 	print_spaces(indent);
 	printf("]");
-	return it.handle;
+	return 0;
 }
 
 int parse_dimension(struct ctx *handle, s64 *active)
 {
 	struct iterator it;
 
-	foreach_in_dict((*handle), it) {
-		char *key = parse_string(&it.handle);
+	foreach_in_dict(handle, it) {
+		char *key = parse_string(it.handle);
 
 		if (IS_ERR(key))
 			return PTR_ERR(handle);
 
 		if (!strcmp(key, "Active")) {
-			const s64 *handle = parse_int64(&it.handle);
+			const s64 *handle = parse_int64(it.handle);
 
 			if (IS_ERR(handle))
 				return PTR_ERR(handle);
 
 			*active = *handle;
 		} else {
-			skip(&it.handle);
+			skip(it.handle);
 		}
 	}
 
-	*handle = it.handle;
 	return 0;
 }
 
@@ -344,35 +349,34 @@ int parse_mode(struct ctx *handle)
 	struct iterator it;
 	s64 horiz, vert;
 
-	foreach_in_dict((*handle), it) {
-		char *key = parse_string(&it.handle);
+	foreach_in_dict(handle, it) {
+		char *key = parse_string(it.handle);
 
 		if (IS_ERR(key))
 			return PTR_ERR(key);
 
 		if (!strcmp(key, "HorizontalAttributes"))
-			ret = parse_dimension(&it.handle, &horiz);
+			ret = parse_dimension(it.handle, &horiz);
 		else if (!strcmp(key, "VerticalAttributes"))
-			ret = parse_dimension(&it.handle, &vert);
+			ret = parse_dimension(it.handle, &vert);
 		else
-			skip(&it.handle);
+			skip(it.handle);
 
 		if (ret)
 			return ret;
 	}
 
 	printf("%ldx%ld\n", horiz, vert);
-	*handle = it.handle;
 	return 0;
 }
 
-int enumerate_modes(struct ctx handle)
+int enumerate_modes(struct ctx *handle)
 {
 	struct iterator it;
 	int ret;
 
 	foreach_in_array(handle, it) {
-		ret = parse_mode(&it.handle);
+		ret = parse_mode(it.handle);
 
 		if (ret)
 			return ret;
@@ -395,7 +399,7 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	enumerate_modes(handle);
+	enumerate_modes(&handle);
 	//print_value(handle, 0);
 	return 0;
 }
