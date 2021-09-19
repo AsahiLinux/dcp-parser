@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #define WARN_ON(cond) assert(!cond)
 #define round_up(x, y) ((x + (y - 1)) & ~(y - 1))
@@ -85,14 +86,25 @@ struct os_tag *parse_tag_type(struct ctx *ctx, enum os_otype type)
 	return tag;
 }
 
-const char *parse_string(struct ctx *handle)
+/* Caller must free */
+char *parse_string(struct ctx *handle)
 {
 	struct os_tag *tag = parse_tag_type(handle, OS_OTYPE_STRING);
+	const char *in;
+	char *out;
 
 	if (IS_ERR(tag))
 		return (void *) tag;
 
-	return parse_bytes(handle, tag->size);
+	in = parse_bytes(handle, tag->size);
+	if (IS_ERR(in))
+		return (void *) in;
+
+	out = malloc(tag->size + 1);
+
+	memcpy(out, in, tag->size);
+	out[tag->size] = '\0';
+	return out;
 }
 
 struct dict_iterator {
@@ -149,7 +161,8 @@ int parse(void *blob, size_t size, struct ctx *ctx)
 }
 
 int main(int argc, const char **argv) {
-	FILE *fp = fopen("test.bin", "rb");
+	//FILE *fp = fopen("test.bin", "rb");
+	FILE *fp = fopen("attributes.bin", "rb");
 	u8 dump[53];
 	fread(dump, 1, sizeof(dump), fp);
 	fclose(fp);
@@ -162,8 +175,16 @@ int main(int argc, const char **argv) {
 
 	struct dict_iterator it;
 	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
-		printf("%s\n", parse_string(&it.handle));
-		printf("%s\n", parse_string(&it.handle));
+		char *key = parse_string(&it.handle);
+		if (IS_ERR(key))
+			return 1;
+		printf("%s\n", key);
+		char *value = parse_string(&it.handle);
+		if (IS_ERR(value))
+			return 1;
+		printf("%s\n", value);
+		free(key);
+		free(value);
 	}
 
 
