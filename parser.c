@@ -35,12 +35,6 @@ struct os_tag {
 	bool last : 1;
 } __packed;
 
-#if 0
-struct os_object {
-	enum os_otype type;
-	union {
-#endif
-
 struct ctx {
 	void *blob;
 	u32 pos, len;
@@ -70,28 +64,36 @@ struct os_tag *parse_tag(struct ctx *ctx)
 	ctx->pos = round_up(ctx->pos, 4);
 
 	tag = parse_bytes(ctx, sizeof(struct os_tag));
+
 	if (IS_ERR(tag))
 		return tag;
+
 	if (tag->padding)
 		return ERR_PTR(-EINVAL);
+
 	return tag;
 }
 
 struct os_tag *parse_tag_type(struct ctx *ctx, enum os_otype type)
 {
 	struct os_tag *tag = parse_tag(ctx);
+
 	if (IS_ERR(tag))
 		return tag;
+
 	if (tag->type != type)
 		return ERR_PTR(-EINVAL);
+
 	return tag;
 }
 
 void skip(struct ctx *handle)
 {
 	struct os_tag *tag = parse_tag(handle);
+
 	if (IS_ERR(tag))
 		return;
+
 	switch (tag->type) {
 	case OS_OTYPE_DICTIONARY:
 		for (int i = 0; i < tag->size; ++i) {
