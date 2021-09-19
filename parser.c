@@ -86,6 +86,40 @@ struct os_tag *parse_tag_type(struct ctx *ctx, enum os_otype type)
 	return tag;
 }
 
+void skip(struct ctx *handle)
+{
+	struct os_tag *tag = parse_tag(handle);
+	if (IS_ERR(tag))
+		return;
+	switch (tag->type) {
+	case OS_OTYPE_DICTIONARY:
+		for (int i = 0; i < tag->size; ++i) {
+			skip(handle);
+			skip(handle);
+		}
+		break;
+
+	case OS_OTYPE_ARRAY:
+		for (int i = 0; i < tag->size; ++i)
+			skip(handle);
+		break;
+
+	case OS_OTYPE_INT64:
+		handle->pos += 8;
+		break;
+	case OS_OTYPE_STRING:
+	case OS_OTYPE_BLOB:
+		handle->pos += tag->size;
+		break;
+	case OS_OTYPE_BOOL:
+		break;
+	default:
+		printf("unknown");
+		break;
+	}
+
+}
+
 /* Caller must free */
 char *parse_string(struct ctx *handle)
 {
@@ -163,7 +197,7 @@ int parse(void *blob, size_t size, struct ctx *ctx)
 int main(int argc, const char **argv) {
 	//FILE *fp = fopen("test.bin", "rb");
 	FILE *fp = fopen("attributes.bin", "rb");
-	u8 dump[53];
+	u8 dump[1068];
 	fread(dump, 1, sizeof(dump), fp);
 	fclose(fp);
 
@@ -178,13 +212,14 @@ int main(int argc, const char **argv) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
 			return 1;
+//		char *value = parse_string(&it.handle);
+//		if (IS_ERR(value))
+//			return 1;
+//		printf("%s\n", value);
 		printf("%s\n", key);
-		char *value = parse_string(&it.handle);
-		if (IS_ERR(value))
-			return 1;
-		printf("%s\n", value);
 		free(key);
-		free(value);
+//		free(value);
+		skip(&it.handle);
 	}
 
 
