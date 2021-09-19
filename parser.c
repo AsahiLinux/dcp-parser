@@ -388,12 +388,58 @@ int parse_dimension(struct ctx *handle, struct dimension *dim)
 	return 0;
 }
 
+int parse_color_modes(struct ctx *handle, s64 *best_id)
+{
+	struct iterator outer_it;
+	int ret = 0;
+	s64 best_score = -1;
+
+	*best_id = -1;
+
+	foreach_in_array(handle, outer_it) {
+		struct iterator it;
+		s64 score = -1, id = -1;
+
+		foreach_in_dict(handle, it) {
+			char *key = parse_string(it.handle);
+
+			if (IS_ERR(key))
+				return PTR_ERR(key);
+
+			if (!strcmp(key, "Score"))
+				ret = parse_int64(it.handle, &score);
+			else if (!strcmp(key, "ID"))
+				ret = parse_int64(it.handle, &id);
+			else
+				skip(it.handle);
+
+			if (ret)
+				return ret;
+		}
+
+		/* Skip partial entries */
+		if (score < 0 || id < 0)
+			continue;
+
+		printf("\t%ld: %ld\n", id, score);
+		if (score > best_score) {
+			best_score = score;
+			*best_id = id;
+		}
+	}
+
+	return 0;
+}
+
+
+
 int parse_mode(struct ctx *handle)
 {
 	int ret = 0;
 	struct iterator it;
 	struct dimension horiz, vert;
 	s64 id = -1;
+	s64 best_color_mode = -1;
 
 	foreach_in_dict(handle, it) {
 		char *key = parse_string(it.handle);
@@ -405,6 +451,8 @@ int parse_mode(struct ctx *handle)
 			ret = parse_dimension(it.handle, &horiz);
 		else if (!strcmp(key, "VerticalAttributes"))
 			ret = parse_dimension(it.handle, &vert);
+		else if (!strcmp(key, "ColorModes"))
+			ret = parse_color_modes(it.handle, &best_color_mode);
 		else if (!strcmp(key, "ID"))
 			ret = parse_int64(it.handle, &id);
 		else
@@ -417,8 +465,8 @@ int parse_mode(struct ctx *handle)
 	printf("%ldx%ld", horiz.active, vert.active);
 	//print_dimension(horiz);
 	print_dimension(vert);
-	printf("\n");
-//	printf(" ID#%ld\n", id);
+	//printf("\n");
+	printf(" ID#%ld, best colour ID#%ld\n", id, best_color_mode);
 	return 0;
 }
 
