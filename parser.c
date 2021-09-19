@@ -15,6 +15,24 @@ typedef uint32_t u32;
 
 #define OSSERIALIZE_HDR 0xd3
 
+enum os_otype {
+	OS_OTYPE_DICTIONARY = 1,
+	OS_OTYPE_ARRAY = 2,
+	OS_OTYPE_INT64 = 4,
+	OS_OTYPE_STRING = 9,
+	OS_OTYPE_BLOB = 10,
+	OS_OTYPE_BOOL = 11
+};
+
+struct os_tag {
+	unsigned int size : 24;
+	enum os_otype otype : 5;
+	unsigned int unk : 2;
+	bool last : 1;
+} __packed;
+
+
+
 struct ctx {
 	void *blob;
 	u32 pos, len;
@@ -30,13 +48,6 @@ void *parse_bytes(struct ctx *ctx, size_t count)
 	ctx->pos += count;
 	return ptr;
 }
-
-struct os_tag {
-	unsigned int size : 24;
-	unsigned int otype : 5;
-	unsigned int unk : 2;
-	bool last : 1;
-} __packed;
 
 u32 *parse_u32(struct ctx *ctx)
 {
