@@ -268,7 +268,7 @@ struct ctx print_value(struct ctx handle, int indent)
 	case OS_OTYPE_BLOB:
 	{
 		skip(&handle);
-		printf("<blob>\n");
+		printf("<blob>");
 		return handle;
 	}
 
@@ -317,10 +317,63 @@ struct ctx print_array(struct ctx handle, int indent)
 	return it.handle;
 }
 
+struct ctx parse_dimension(struct ctx handle, s64 *active)
+{
+	struct iterator it;
+
+	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
+		char *key = parse_string(&it.handle);
+		if (IS_ERR(key))
+			return handle;
+
+		if (!strcmp(key, "Active")) {
+			const s64 *handle = parse_int64(&it.handle);
+			if (!IS_ERR(handle))
+				*active = *handle;
+		} else {
+			skip(&it.handle);
+		}
+	}
+
+	return it.handle;
+}
+
+struct ctx parse_mode(struct ctx handle)
+{
+	struct iterator it;
+	s64 horiz, vert;
+
+	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
+		char *key = parse_string(&it.handle);
+		if (IS_ERR(key))
+			return handle;
+
+		if (!strcmp(key, "HorizontalAttributes"))
+			it.handle = parse_dimension(it.handle, &horiz);
+		else if (!strcmp(key, "VerticalAttributes"))
+			it.handle = parse_dimension(it.handle, &vert);
+		else
+			skip(&it.handle);
+	}
+
+	printf("%ldx%ld\n", horiz, vert);
+	return it.handle;
+}
+
+void enumerate_modes(struct ctx handle)
+{
+	struct iterator it;
+
+	for (iterator_begin(handle, &it, false); iterator_not_done(&it); iterator_next(&it)) {
+		it.handle = parse_mode(it.handle);
+	}
+}
+
 int main(int argc, const char **argv) {
 	//FILE *fp = fopen("test.bin", "rb");
-	FILE *fp = fopen("attributes.bin", "rb");
-	u8 dump[1068];
+	//FILE *fp = fopen("attributes.bin", "rb");
+	FILE *fp = fopen("timings.bin", "rb");
+	u8 dump[196616];
 	fread(dump, 1, sizeof(dump), fp);
 	fclose(fp);
 
@@ -330,6 +383,7 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	print_value(handle, 0);
+	enumerate_modes(handle);
+	//print_value(handle, 0);
 	return 0;
 }
