@@ -344,7 +344,16 @@ int print_array(struct ctx *handle, int indent)
 	return 0;
 }
 
-int parse_dimension(struct ctx *handle, s64 *active)
+struct dimension {
+	s64 total, front_porch, sync_width, back_porch, active;
+	s64 sync_rate, precise_sync_rate;
+};
+
+void print_dimension(struct dimension dim) {
+	printf(" (%f)", (float) dim.precise_sync_rate / 65536.0);
+}
+
+int parse_dimension(struct ctx *handle, struct dimension *dim)
 {
 	struct iterator it;
 	int ret = 0;
@@ -356,7 +365,19 @@ int parse_dimension(struct ctx *handle, s64 *active)
 			return PTR_ERR(handle);
 
 		if (!strcmp(key, "Active"))
-			ret = parse_int64(it.handle, active);
+			ret = parse_int64(it.handle, &dim->active);
+		else if (!strcmp(key, "Total"))
+			ret = parse_int64(it.handle, &dim->total);
+		else if (!strcmp(key, "FrontPorch"))
+			ret = parse_int64(it.handle, &dim->front_porch);
+		else if (!strcmp(key, "BackPorch"))
+			ret = parse_int64(it.handle, &dim->back_porch);
+		else if (!strcmp(key, "SyncWidth"))
+			ret = parse_int64(it.handle, &dim->sync_width);
+		else if (!strcmp(key, "SyncRate"))
+			ret = parse_int64(it.handle, &dim->sync_rate);
+		else if (!strcmp(key, "PreciseSyncRate"))
+			ret = parse_int64(it.handle, &dim->precise_sync_rate);
 		else
 			skip(it.handle);
 
@@ -371,7 +392,8 @@ int parse_mode(struct ctx *handle)
 {
 	int ret = 0;
 	struct iterator it;
-	s64 horiz, vert;
+	struct dimension horiz, vert;
+	s64 id = -1;
 
 	foreach_in_dict(handle, it) {
 		char *key = parse_string(it.handle);
@@ -383,6 +405,8 @@ int parse_mode(struct ctx *handle)
 			ret = parse_dimension(it.handle, &horiz);
 		else if (!strcmp(key, "VerticalAttributes"))
 			ret = parse_dimension(it.handle, &vert);
+		else if (!strcmp(key, "ID"))
+			ret = parse_int64(it.handle, &id);
 		else
 			skip(it.handle);
 
@@ -390,7 +414,11 @@ int parse_mode(struct ctx *handle)
 			return ret;
 	}
 
-	printf("%ldx%ld\n", horiz, vert);
+	printf("%ldx%ld", horiz.active, vert.active);
+	//print_dimension(horiz);
+	print_dimension(vert);
+	printf("\n");
+//	printf(" ID#%ld\n", id);
 	return 0;
 }
 
