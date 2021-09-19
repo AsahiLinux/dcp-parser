@@ -148,14 +148,21 @@ char *parse_string(struct ctx *handle)
 	return out;
 }
 
-const s64 *parse_int64(struct ctx *handle)
+int parse_int64(struct ctx *handle, s64 *value)
 {
 	void *tag = parse_tag_type(handle, OS_OTYPE_INT64);
+	s64 *in;
 
 	if (IS_ERR(tag))
-		return tag;
+		return PTR_ERR(tag);
 
-	return parse_bytes(handle, sizeof(s64));
+	in = parse_bytes(handle, sizeof(s64));
+
+	if (IS_ERR(in))
+		return PTR_ERR(in);
+
+	memcpy(value, in, sizeof(*value));
+	return 0;
 }
 
 bool parse_bool(struct ctx *handle)
@@ -226,6 +233,8 @@ int print_array(struct ctx *handle, int indent);
 
 int print_value(struct ctx *handle, int indent)
 {
+	int ret;
+
 	switch (peek_type(*handle)) {
 	case OS_OTYPE_DICTIONARY:
 		return print_dict(handle, indent);
@@ -253,10 +262,13 @@ int print_value(struct ctx *handle, int indent)
 
 	case OS_OTYPE_INT64:
 	{
-		const s64 *v = parse_int64(handle);
-		if (IS_ERR(v))
-			return PTR_ERR(v);
-		printf("%ld", *v);
+		s64 v;
+
+		ret = parse_int64(handle, &v);
+		if (ret)
+			return ret;
+
+		printf("%ld", v);
 		return 0;
 	}
 
@@ -323,6 +335,7 @@ int print_array(struct ctx *handle, int indent)
 int parse_dimension(struct ctx *handle, s64 *active)
 {
 	struct iterator it;
+	int ret = 0;
 
 	foreach_in_dict(handle, it) {
 		char *key = parse_string(it.handle);
@@ -330,16 +343,13 @@ int parse_dimension(struct ctx *handle, s64 *active)
 		if (IS_ERR(key))
 			return PTR_ERR(handle);
 
-		if (!strcmp(key, "Active")) {
-			const s64 *handle = parse_int64(it.handle);
-
-			if (IS_ERR(handle))
-				return PTR_ERR(handle);
-
-			*active = *handle;
-		} else {
+		if (!strcmp(key, "Active"))
+			ret = parse_int64(it.handle, active);
+		else
 			skip(it.handle);
-		}
+
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -401,7 +411,7 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	//enumerate_modes(&handle);
-	print_value(&handle, 0);
+	enumerate_modes(&handle);
+	//print_value(&handle, 0);
 	return 0;
 }
