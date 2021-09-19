@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 #include <errno.h>
 
 #define round_up(x, y) ((x + (y - 1)) & ~(y - 1))
+#define __packed __attribute__((packed))
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -29,23 +31,35 @@ void *parse_bytes(struct ctx *ctx, size_t count)
 	return ptr;
 }
 
+struct os_tag {
+	unsigned int size : 24;
+	unsigned int otype : 5;
+	unsigned int unk : 2;
+	bool last : 1;
+} __packed;
+
 u32 *parse_u32(struct ctx *ctx)
 {
 	return parse_bytes(ctx, sizeof(u32));
 }
 
+struct os_tag *parse_tag(struct ctx *ctx)
+{
+	return parse_bytes(ctx, sizeof(struct os_tag));
+}
+
 int parse_obj(struct ctx *ctx)
 {
-	u32 *tag;
+	struct os_tag *tag;
 
 	/* Align to 32-bits */
 	ctx->pos = round_up(ctx->pos, 4);
 
-	tag = parse_u32(ctx);
+	tag = parse_tag(ctx);
 	if (IS_ERR(tag))
 		return PTR_ERR(ret);
 
-	printf("Tag: %X\n", *tag);
+	printf("Tag: %u %u %u\n", tag->last, tag->otype, tag->size);
 
 	return 0;
 }
