@@ -421,7 +421,7 @@ int parse_color_modes(struct ctx *handle, s64 *best_id)
 		if (score < 0 || id < 0)
 			continue;
 
-		printf("\t%ld: %ld\n", id, score);
+		//printf("\t%ld: %ld\n", id, score);
 		if (score > best_score) {
 			best_score = score;
 			*best_id = id;
@@ -440,6 +440,7 @@ int parse_mode(struct ctx *handle)
 	struct dimension horiz, vert;
 	s64 id = -1;
 	s64 best_color_mode = -1;
+	bool is_preferred = false;
 
 	foreach_in_dict(handle, it) {
 		char *key = parse_string(it.handle);
@@ -453,6 +454,8 @@ int parse_mode(struct ctx *handle)
 			ret = parse_dimension(it.handle, &vert);
 		else if (!strcmp(key, "ColorModes"))
 			ret = parse_color_modes(it.handle, &best_color_mode);
+		else if (!strcmp(key, "IsPreferred"))
+			ret = parse_bool(it.handle, &is_preferred);
 		else if (!strcmp(key, "ID"))
 			ret = parse_int64(it.handle, &id);
 		else
@@ -466,7 +469,7 @@ int parse_mode(struct ctx *handle)
 	//print_dimension(horiz);
 	print_dimension(vert);
 	//printf("\n");
-	printf(" ID#%ld, best colour ID#%ld\n", id, best_color_mode);
+	printf(" ID#%ld, best colour ID#%ld%s\n", id, best_color_mode, is_preferred ? " *" : "");
 	return 0;
 }
 
