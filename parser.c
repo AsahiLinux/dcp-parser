@@ -191,15 +191,10 @@ int iterator_begin(struct ctx handle, struct iterator *it, bool dictionary)
 	return 0;
 }
 
-bool iterator_not_done(struct iterator *it)
-{
-	return it->idx < it->len;
-}
-
-void iterator_next(struct iterator *it)
-{
-	it->idx++;
-}
+#define foreach_in_array(handle, it) \
+	for (iterator_begin(handle, &it, false); it.idx < it.len; ++it.idx)
+#define foreach_in_dict(handle, it) \
+	for (iterator_begin(handle, &it, true); it.idx < it.len; ++it.idx)
 
 int parse(void *blob, size_t size, struct ctx *ctx)
 {
@@ -283,7 +278,7 @@ struct ctx print_dict(struct ctx handle, int indent)
 	struct iterator it;
 
 	printf("{\n");
-	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
+	foreach_in_dict(handle, it) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
 			return handle;
@@ -306,7 +301,7 @@ struct ctx print_array(struct ctx handle, int indent)
 	struct iterator it;
 
 	printf("[\n");
-	for (iterator_begin(handle, &it, false); iterator_not_done(&it); iterator_next(&it)) {
+	foreach_in_array(handle, it) {
 		print_spaces(indent + 1);
 		it.handle = print_value(it.handle, indent + 1);
 		printf(",\n");
@@ -321,7 +316,7 @@ struct ctx parse_dimension(struct ctx handle, s64 *active)
 {
 	struct iterator it;
 
-	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
+	foreach_in_dict(handle, it) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
 			return handle;
@@ -343,7 +338,7 @@ struct ctx parse_mode(struct ctx handle)
 	struct iterator it;
 	s64 horiz, vert;
 
-	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
+	foreach_in_dict(handle, it) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
 			return handle;
@@ -364,7 +359,7 @@ void enumerate_modes(struct ctx handle)
 {
 	struct iterator it;
 
-	for (iterator_begin(handle, &it, false); iterator_not_done(&it); iterator_next(&it)) {
+	foreach_in_array(handle, it) {
 		it.handle = parse_mode(it.handle);
 	}
 }
