@@ -33,6 +33,12 @@ struct os_tag {
 	bool last : 1;
 } __packed;
 
+#if 0
+struct os_object {
+	enum os_otype type;
+	union {
+#endif
+
 struct ctx {
 	void *blob;
 	u32 pos, len;
