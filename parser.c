@@ -290,6 +290,8 @@ int print_dict(struct ctx *handle, int indent)
 		ret = print_value(it.handle, indent + 1);
 		if (ret)
 			return ret;
+
+		printf(",\n");
 	}
 
 	print_spaces(indent);
@@ -399,7 +401,7 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	enumerate_modes(&handle);
-	//print_value(handle, 0);
+	//enumerate_modes(&handle);
+	print_value(&handle, 0);
 	return 0;
 }
