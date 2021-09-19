@@ -8,13 +8,24 @@ typedef uint32_t u32;
 
 #define OSSERIALIZE_HDR 0xd3
 
-int parse(u8 *blob, size_t size)
+struct ctx {
+	void *blob;
+	u32 pos, len;
+};
+
+int parse(void *blob, size_t size)
 {
-	if (size < 4)
-		return -EINVAL;
+	struct ctx ctx = {
+		.blob = blob,
+		.len = size,
+		.pos = 0,
+	};
+
+	u32 *header = ctx.blob + ctx.pos;
 
 	/* Parse the header */
-	u32 *header = (u32 *) blob;
+	if (ctx.pos + sizeof(*header) > ctx.len)
+		return -EINVAL;
 
 	if (*header != OSSERIALIZE_HDR)
 		return -EINVAL;
@@ -28,5 +39,7 @@ int main(int argc, const char **argv) {
 	fread(dump, 1, sizeof(dump), fp);
 	fclose(fp);
 
-	parse(dump, sizeof(dump));
+	int ret;
+	ret = parse(dump, sizeof(dump));
+	printf("%u\n", ret);
 }
