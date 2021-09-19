@@ -214,6 +214,42 @@ void print_spaces(int indent) {
 	while(spaces--) putchar(' ');
 }
 
+struct ctx print_dict(struct ctx handle, int indent);
+
+struct ctx print_value(struct ctx handle, int indent)
+{
+	switch (peek_type(handle)) {
+	case OS_OTYPE_DICTIONARY:
+		return print_dict(handle, indent);
+
+	case OS_OTYPE_STRING:
+	{
+		char *val = parse_string(&handle);
+		if (IS_ERR(val))
+			return handle;
+
+		printf("\"%s\"", val);
+		free(val);
+		return handle;
+	}
+
+	case OS_OTYPE_BOOL:
+	{
+		bool b = parse_bool(&handle);
+		printf("%s", b ? "true" : "false");
+		return handle;
+	}
+
+	case OS_OTYPE_ARRAY:
+	case OS_OTYPE_INT64:
+	case OS_OTYPE_BLOB:
+	default:
+		skip(&handle);
+		printf("...");
+		return handle;
+	}
+}
+
 struct ctx print_dict(struct ctx handle, int indent)
 {
 	struct dict_iterator it;
@@ -228,38 +264,7 @@ struct ctx print_dict(struct ctx handle, int indent)
 		printf("\"%s\": ", key);
 		free(key);
 
-		enum os_otype T = peek_type(it.handle);
-		switch (T) {
-		case OS_OTYPE_DICTIONARY:
-			it.handle = print_dict(it.handle, indent + 1);
-			break;
-
-		case OS_OTYPE_STRING:
-		{
-			char *val = parse_string(&it.handle);
-			if (IS_ERR(val))
-				return handle;
-
-			printf("\"%s\"", val);
-			free(val);
-			break;
-		}
-
-		case OS_OTYPE_BOOL:
-		{
-			bool b = parse_bool(&it.handle);
-			printf("%s", b ? "true" : "false");
-			break;
-		}
-
-		case OS_OTYPE_ARRAY:
-		case OS_OTYPE_INT64:
-		case OS_OTYPE_BLOB:
-		default:
-			skip(&it.handle);
-			printf("...");
-		}
-
+		it.handle = print_value(it.handle, indent + 1);
 		printf(",\n");
 	}
 
@@ -281,6 +286,6 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	print_dict(handle, 0);
+	print_value(handle, 0);
 	return 0;
 }
