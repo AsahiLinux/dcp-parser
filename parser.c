@@ -12,6 +12,7 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef int64_t s64;
 #define ERR_PTR(err) NULL
 #define PTR_ERR(ptr) -EINVAL
 #define IS_ERR(ptr) (ptr == NULL)
@@ -147,6 +148,16 @@ char *parse_string(struct ctx *handle)
 	return out;
 }
 
+const s64 *parse_int64(struct ctx *handle)
+{
+	void *tag = parse_tag_type(handle, OS_OTYPE_INT64);
+
+	if (IS_ERR(tag))
+		return tag;
+
+	return parse_bytes(handle, sizeof(s64));
+}
+
 bool parse_bool(struct ctx *handle)
 {
 	struct os_tag *tag = parse_tag_type(handle, OS_OTYPE_BOOL);
@@ -240,8 +251,16 @@ struct ctx print_value(struct ctx handle, int indent)
 		return handle;
 	}
 
-	case OS_OTYPE_ARRAY:
 	case OS_OTYPE_INT64:
+	{
+		const s64 *v = parse_int64(&handle);
+		if (IS_ERR(v))
+			return handle;
+		printf("%ld", *v);
+		return handle;
+	}
+
+	case OS_OTYPE_ARRAY:
 	case OS_OTYPE_BLOB:
 	default:
 		skip(&handle);
