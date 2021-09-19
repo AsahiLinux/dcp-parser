@@ -225,9 +225,19 @@ struct ctx print_dict(struct ctx handle, int indent)
 			it.handle = print_dict(it.handle, indent + 1);
 			break;
 
+		case OS_OTYPE_STRING:
+		{
+			char *val = parse_string(&it.handle);
+			if (IS_ERR(val))
+				return handle;
+
+			printf("\"%s\"", val);
+			free(val);
+			break;
+		}
+
 		case OS_OTYPE_ARRAY:
 		case OS_OTYPE_INT64:
-		case OS_OTYPE_STRING:
 		case OS_OTYPE_BLOB:
 		case OS_OTYPE_BOOL:
 		default:
