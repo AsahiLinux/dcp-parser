@@ -236,13 +236,6 @@ struct ctx print_dict(struct ctx handle, int indent)
 		}
 
 		printf(",\n");
-
-		//printf("type %u\n", T);
-//		char *value = parse_string(&it.handle);
-//		if (IS_ERR(value))
-//			return 1;
-//		printf("%s\n", value);
-//		free(value);
 	}
 
 	print_spaces(indent);
