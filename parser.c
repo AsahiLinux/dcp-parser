@@ -205,7 +205,7 @@ void print_spaces(int indent) {
 	while(spaces--) putchar(' ');
 }
 
-int print_dict(struct ctx handle, int indent)
+struct ctx print_dict(struct ctx handle, int indent)
 {
 	struct dict_iterator it;
 
@@ -213,7 +213,7 @@ int print_dict(struct ctx handle, int indent)
 	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
-			return 1;
+			return handle;
 
 		print_spaces(indent + 1);
 		printf("\"%s\": ", key);
@@ -222,6 +222,9 @@ int print_dict(struct ctx handle, int indent)
 		enum os_otype T = peek_type(it.handle);
 		switch (T) {
 		case OS_OTYPE_DICTIONARY:
+			it.handle = print_dict(it.handle, indent + 1);
+			break;
+
 		case OS_OTYPE_ARRAY:
 		case OS_OTYPE_INT64:
 		case OS_OTYPE_STRING:
@@ -242,8 +245,9 @@ int print_dict(struct ctx handle, int indent)
 //		free(value);
 	}
 
-	printf("}\n");
-	return 0;
+	print_spaces(indent);
+	printf("}");
+	return it.handle;
 }
 
 int main(int argc, const char **argv) {
@@ -259,5 +263,6 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	return print_dict(handle, 0);
+	print_dict(handle, 0);
+	return 0;
 }
