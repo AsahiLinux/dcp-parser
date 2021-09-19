@@ -260,8 +260,14 @@ struct ctx print_value(struct ctx handle, int indent)
 		return handle;
 	}
 
-	case OS_OTYPE_ARRAY:
 	case OS_OTYPE_BLOB:
+	{
+		skip(&handle);
+		printf("<blob>\n");
+		return handle;
+	}
+
+	case OS_OTYPE_ARRAY:
 	default:
 		skip(&handle);
 		printf("...");
