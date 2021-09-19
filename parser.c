@@ -165,13 +165,14 @@ int parse_int64(struct ctx *handle, s64 *value)
 	return 0;
 }
 
-bool parse_bool(struct ctx *handle)
+int parse_bool(struct ctx *handle, bool *b)
 {
 	struct os_tag *tag = parse_tag_type(handle, OS_OTYPE_BOOL);
 	if (IS_ERR(tag))
-		return false;
+		return PTR_ERR(tag);
 
-	return !!tag->size;
+	*b = !!tag->size;
+	return 0;
 }
 
 struct iterator {
@@ -255,9 +256,14 @@ int print_value(struct ctx *handle, int indent)
 
 	case OS_OTYPE_BOOL:
 	{
-		bool b = parse_bool(handle);
+		bool b;
+
+		ret = parse_bool(handle, &b);
+		if (ret)
+			return ret;
+
 		printf("%s", b ? "true" : "false");
-		return 0; // TODO error
+		return 0;
 	}
 
 	case OS_OTYPE_INT64:
