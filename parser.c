@@ -128,26 +128,22 @@ void dict_iterator_next(struct dict_iterator *it)
 	it->idx++;
 }
 
-int parse(void *blob, size_t size)
+int parse(void *blob, size_t size, struct ctx *ctx)
 {
-	struct ctx ctx = {
+	u32 *header;
+
+	*ctx = (struct ctx) {
 		.blob = blob,
 		.len = size,
 		.pos = 0,
 	};
 
-	u32 *header = parse_u32(&ctx);
+	header = parse_u32(ctx);
 	if (IS_ERR(header))
 		return PTR_ERR(header);
 
 	if (*header != OSSERIALIZE_HDR)
 		return -EINVAL;
-
-	struct dict_iterator it;
-	for (dict_iterator_begin(ctx, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
-		printf("%s\n", parse_string(&it.handle));
-		printf("%s\n", parse_string(&it.handle));
-	}
 
 	return 0;
 }
@@ -158,7 +154,17 @@ int main(int argc, const char **argv) {
 	fread(dump, 1, sizeof(dump), fp);
 	fclose(fp);
 
+	struct ctx handle;
+
 	int ret;
-	ret = parse(dump, sizeof(dump));
+	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
+
+	struct dict_iterator it;
+	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
+		printf("%s\n", parse_string(&it.handle));
+		printf("%s\n", parse_string(&it.handle));
+	}
+
+
 }
