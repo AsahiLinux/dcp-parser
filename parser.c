@@ -307,6 +307,7 @@ struct ctx print_array(struct ctx handle, int indent)
 
 	printf("[\n");
 	for (iterator_begin(handle, &it, false); iterator_not_done(&it); iterator_next(&it)) {
+		print_spaces(indent + 1);
 		it.handle = print_value(it.handle, indent + 1);
 		printf(",\n");
 	}
