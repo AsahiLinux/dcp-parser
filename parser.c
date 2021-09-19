@@ -147,6 +147,15 @@ char *parse_string(struct ctx *handle)
 	return out;
 }
 
+bool parse_bool(struct ctx *handle)
+{
+	struct os_tag *tag = parse_tag_type(handle, OS_OTYPE_BOOL);
+	if (IS_ERR(tag))
+		return false;
+
+	return !!tag->size;
+}
+
 struct dict_iterator {
 	struct ctx handle;
 	u32 idx;
@@ -236,10 +245,16 @@ struct ctx print_dict(struct ctx handle, int indent)
 			break;
 		}
 
+		case OS_OTYPE_BOOL:
+		{
+			bool b = parse_bool(&it.handle);
+			printf("%s", b ? "true" : "false");
+			break;
+		}
+
 		case OS_OTYPE_ARRAY:
 		case OS_OTYPE_INT64:
 		case OS_OTYPE_BLOB:
-		case OS_OTYPE_BOOL:
 		default:
 			skip(&it.handle);
 			printf("...");
