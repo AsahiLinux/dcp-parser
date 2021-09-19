@@ -7,6 +7,9 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+#define ERR_PTR(err) NULL
+#define PTR_ERR(ptr) -EINVAL
+#define IS_ERR(ptr) (ptr == NULL)
 
 #define OSSERIALIZE_HDR 0xd3
 
@@ -15,29 +18,34 @@ struct ctx {
 	u32 pos, len;
 };
 
-int parse_u32(struct ctx *ctx, u32 *out)
+void *parse_bytes(struct ctx *ctx, size_t count)
 {
-	if (ctx->pos + sizeof(*out) > ctx->len)
-		return -EINVAL;
+	void *ptr = ctx->blob + ctx->pos;
 
-	memcpy(out, ctx->blob + ctx->pos, sizeof(*out));
-	ctx->pos += sizeof(*out);
-	return 0;
+	if (ctx->pos + count > ctx->len)
+		return ERR_PTR(-EINVAL);
+
+	ctx->pos += count;
+	return ptr;
+}
+
+u32 *parse_u32(struct ctx *ctx)
+{
+	return parse_bytes(ctx, sizeof(u32));
 }
 
 int parse_obj(struct ctx *ctx)
 {
-	int ret;
-	u32 tag;
+	u32 *tag;
 
 	/* Align to 32-bits */
 	ctx->pos = round_up(ctx->pos, 4);
 
-	ret = parse_u32(ctx, &tag);
-	if (ret)
-		return ret;
+	tag = parse_u32(ctx);
+	if (IS_ERR(tag))
+		return PTR_ERR(ret);
 
-	printf("Tag: %X\n", tag);
+	printf("Tag: %X\n", *tag);
 
 	return 0;
 }
@@ -50,14 +58,11 @@ int parse(void *blob, size_t size)
 		.pos = 0,
 	};
 
-	int ret;
-	u32 header;
+	u32 *header = parse_u32(&ctx);
+	if (IS_ERR(header))
+		return PTR_ERR(header);
 
-	ret = parse_u32(&ctx, &header);
-	if (ret)
-		return ret;
-
-	if (header != OSSERIALIZE_HDR)
+	if (*header != OSSERIALIZE_HDR)
 		return -EINVAL;
 
 	parse_obj(&ctx);
