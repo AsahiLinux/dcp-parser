@@ -87,40 +87,44 @@ struct os_tag *parse_tag_type(struct ctx *ctx, enum os_otype type)
 	return tag;
 }
 
-void skip(struct ctx *handle)
+int skip(struct ctx *handle)
 {
 	struct os_tag *tag = parse_tag(handle);
+	int ret = 0;
 
 	if (IS_ERR(tag))
-		return;
+		return PTR_ERR(tag);
 
 	switch (tag->type) {
 	case OS_OTYPE_DICTIONARY:
 		for (int i = 0; i < tag->size; ++i) {
-			skip(handle);
-			skip(handle);
+			ret |= skip(handle);
+			ret |= skip(handle);
 		}
-		break;
+
+		return ret;
 
 	case OS_OTYPE_ARRAY:
 		for (int i = 0; i < tag->size; ++i)
-			skip(handle);
-		break;
+			ret |= skip(handle);
+
+		return ret;
 
 	case OS_OTYPE_INT64:
 		handle->pos += 8;
-		break;
+		return 0;
+
 	case OS_OTYPE_STRING:
 	case OS_OTYPE_BLOB:
 		handle->pos += tag->size;
-		break;
-	case OS_OTYPE_BOOL:
-		break;
-	default:
-		printf("unknown");
-		break;
-	}
+		return 0;
 
+	case OS_OTYPE_BOOL:
+		return 0;
+
+	default:
+		return -EINVAL;
+	}
 }
 
 enum os_otype peek_type(struct ctx handle)
