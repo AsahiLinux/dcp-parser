@@ -312,56 +312,73 @@ struct ctx print_array(struct ctx handle, int indent)
 	return it.handle;
 }
 
-struct ctx parse_dimension(struct ctx handle, s64 *active)
+int parse_dimension(struct ctx *handle, s64 *active)
 {
 	struct iterator it;
 
-	foreach_in_dict(handle, it) {
+	foreach_in_dict((*handle), it) {
 		char *key = parse_string(&it.handle);
+
 		if (IS_ERR(key))
-			return handle;
+			return PTR_ERR(handle);
 
 		if (!strcmp(key, "Active")) {
 			const s64 *handle = parse_int64(&it.handle);
-			if (!IS_ERR(handle))
-				*active = *handle;
+
+			if (IS_ERR(handle))
+				return PTR_ERR(handle);
+
+			*active = *handle;
 		} else {
 			skip(&it.handle);
 		}
 	}
 
-	return it.handle;
+	*handle = it.handle;
+	return 0;
 }
 
-struct ctx parse_mode(struct ctx handle)
+int parse_mode(struct ctx *handle)
 {
+	int ret = 0;
 	struct iterator it;
 	s64 horiz, vert;
 
-	foreach_in_dict(handle, it) {
+	foreach_in_dict((*handle), it) {
 		char *key = parse_string(&it.handle);
+
 		if (IS_ERR(key))
-			return handle;
+			return PTR_ERR(key);
 
 		if (!strcmp(key, "HorizontalAttributes"))
-			it.handle = parse_dimension(it.handle, &horiz);
+			ret = parse_dimension(&it.handle, &horiz);
 		else if (!strcmp(key, "VerticalAttributes"))
-			it.handle = parse_dimension(it.handle, &vert);
+			ret = parse_dimension(&it.handle, &vert);
 		else
 			skip(&it.handle);
+
+		if (ret)
+			return ret;
 	}
 
 	printf("%ldx%ld\n", horiz, vert);
-	return it.handle;
+	*handle = it.handle;
+	return 0;
 }
 
-void enumerate_modes(struct ctx handle)
+int enumerate_modes(struct ctx handle)
 {
 	struct iterator it;
+	int ret;
 
 	foreach_in_array(handle, it) {
-		it.handle = parse_mode(it.handle);
+		ret = parse_mode(&it.handle);
+
+		if (ret)
+			return ret;
 	}
+
+	return 0;
 }
 
 int main(int argc, const char **argv) {
