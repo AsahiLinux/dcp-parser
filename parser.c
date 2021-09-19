@@ -167,22 +167,23 @@ bool parse_bool(struct ctx *handle)
 	return !!tag->size;
 }
 
-struct dict_iterator {
+struct iterator {
 	struct ctx handle;
 	u32 idx;
 	u32 len;
 };
 
-int dict_iterator_begin(struct ctx dict, struct dict_iterator *it)
+int iterator_begin(struct ctx handle, struct iterator *it, bool dictionary)
 {
 	struct os_tag *tag;
+	enum os_otype type = dictionary ? OS_OTYPE_DICTIONARY : OS_OTYPE_ARRAY;
 
-	*it = (struct dict_iterator) {
-		.handle = dict,
+	*it = (struct iterator) {
+		.handle = handle,
 		.idx = 0
 	};
 
-	tag = parse_tag_type(&it->handle, OS_OTYPE_DICTIONARY);
+	tag = parse_tag_type(&it->handle, type);
 	if (IS_ERR(tag))
 		return PTR_ERR(tag);
 
@@ -190,12 +191,12 @@ int dict_iterator_begin(struct ctx dict, struct dict_iterator *it)
 	return 0;
 }
 
-bool dict_iterator_not_done(struct dict_iterator *it)
+bool iterator_not_done(struct iterator *it)
 {
 	return it->idx < it->len;
 }
 
-void dict_iterator_next(struct dict_iterator *it)
+void iterator_next(struct iterator *it)
 {
 	it->idx++;
 }
@@ -226,12 +227,16 @@ void print_spaces(int indent) {
 }
 
 struct ctx print_dict(struct ctx handle, int indent);
+struct ctx print_array(struct ctx handle, int indent);
 
 struct ctx print_value(struct ctx handle, int indent)
 {
 	switch (peek_type(handle)) {
 	case OS_OTYPE_DICTIONARY:
 		return print_dict(handle, indent);
+
+	case OS_OTYPE_ARRAY:
+		return print_array(handle, indent);
 
 	case OS_OTYPE_STRING:
 	{
@@ -267,20 +272,18 @@ struct ctx print_value(struct ctx handle, int indent)
 		return handle;
 	}
 
-	case OS_OTYPE_ARRAY:
 	default:
-		skip(&handle);
-		printf("...");
+		WARN_ON(true);
 		return handle;
 	}
 }
 
 struct ctx print_dict(struct ctx handle, int indent)
 {
-	struct dict_iterator it;
+	struct iterator it;
 
 	printf("{\n");
-	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
+	for (iterator_begin(handle, &it, true); iterator_not_done(&it); iterator_next(&it)) {
 		char *key = parse_string(&it.handle);
 		if (IS_ERR(key))
 			return handle;
@@ -295,6 +298,21 @@ struct ctx print_dict(struct ctx handle, int indent)
 
 	print_spaces(indent);
 	printf("}");
+	return it.handle;
+}
+
+struct ctx print_array(struct ctx handle, int indent)
+{
+	struct iterator it;
+
+	printf("[\n");
+	for (iterator_begin(handle, &it, false); iterator_not_done(&it); iterator_next(&it)) {
+		it.handle = print_value(it.handle, indent + 1);
+		printf(",\n");
+	}
+
+	print_spaces(indent);
+	printf("]");
 	return it.handle;
 }
 
