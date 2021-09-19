@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <assert.h>
 #include <errno.h>
 
+#define WARN_ON(cond) assert(!cond)
 #define round_up(x, y) ((x + (y - 1)) & ~(y - 1))
 #define __packed __attribute__((packed))
 typedef uint8_t u8;
@@ -26,12 +28,10 @@ enum os_otype {
 
 struct os_tag {
 	unsigned int size : 24;
-	enum os_otype otype : 5;
-	unsigned int unk : 2;
+	enum os_otype type : 5;
+	unsigned int padding : 2;
 	bool last : 1;
 } __packed;
-
-
 
 struct ctx {
 	void *blob;
@@ -70,7 +70,21 @@ int parse_obj(struct ctx *ctx)
 	if (IS_ERR(tag))
 		return PTR_ERR(ret);
 
-	printf("Tag: %u %u %u\n", tag->last, tag->otype, tag->size);
+	WARN_ON(tag->padding != 0);
+
+	printf("Tag: %u %u %u\n", tag->last, tag->type, tag->size);
+
+	switch (tag->type) {
+	case OS_OTYPE_DICTIONARY:
+	case OS_OTYPE_ARRAY:
+	case OS_OTYPE_INT64:
+	case OS_OTYPE_STRING:
+	case OS_OTYPE_BLOB:
+	case OS_OTYPE_BOOL:
+	default:
+		printf("TODO!\n");
+		return -EINVAL;
+	}
 
 	return 0;
 }
