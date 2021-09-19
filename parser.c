@@ -120,6 +120,12 @@ void skip(struct ctx *handle)
 
 }
 
+enum os_otype peek_type(struct ctx handle)
+{
+	struct os_tag *tag = parse_tag(&handle);
+	return tag->type;
+}
+
 /* Caller must free */
 char *parse_string(struct ctx *handle)
 {
@@ -194,6 +200,52 @@ int parse(void *blob, size_t size, struct ctx *ctx)
 	return 0;
 }
 
+void print_spaces(int indent) {
+	int spaces = indent * 4;
+	while(spaces--) putchar(' ');
+}
+
+int print_dict(struct ctx handle, int indent)
+{
+	struct dict_iterator it;
+
+	printf("{\n");
+	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
+		char *key = parse_string(&it.handle);
+		if (IS_ERR(key))
+			return 1;
+
+		print_spaces(indent + 1);
+		printf("\"%s\": ", key);
+		free(key);
+
+		enum os_otype T = peek_type(it.handle);
+		switch (T) {
+		case OS_OTYPE_DICTIONARY:
+		case OS_OTYPE_ARRAY:
+		case OS_OTYPE_INT64:
+		case OS_OTYPE_STRING:
+		case OS_OTYPE_BLOB:
+		case OS_OTYPE_BOOL:
+		default:
+			skip(&it.handle);
+			printf("...");
+		}
+
+		printf(",\n");
+
+		//printf("type %u\n", T);
+//		char *value = parse_string(&it.handle);
+//		if (IS_ERR(value))
+//			return 1;
+//		printf("%s\n", value);
+//		free(value);
+	}
+
+	printf("}\n");
+	return 0;
+}
+
 int main(int argc, const char **argv) {
 	//FILE *fp = fopen("test.bin", "rb");
 	FILE *fp = fopen("attributes.bin", "rb");
@@ -207,20 +259,5 @@ int main(int argc, const char **argv) {
 	ret = parse(dump, sizeof(dump), &handle);
 	printf("%u\n", ret);
 
-	struct dict_iterator it;
-	for (dict_iterator_begin(handle, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
-		char *key = parse_string(&it.handle);
-		if (IS_ERR(key))
-			return 1;
-//		char *value = parse_string(&it.handle);
-//		if (IS_ERR(value))
-//			return 1;
-//		printf("%s\n", value);
-		printf("%s\n", key);
-		free(key);
-//		free(value);
-		skip(&it.handle);
-	}
-
-
+	return print_dict(handle, 0);
 }
