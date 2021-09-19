@@ -62,56 +62,70 @@ u32 *parse_u32(struct ctx *ctx)
 
 struct os_tag *parse_tag(struct ctx *ctx)
 {
-	return parse_bytes(ctx, sizeof(struct os_tag));
-}
-
-int parse_obj(struct ctx *ctx)
-{
 	struct os_tag *tag;
 
 	/* Align to 32-bits */
 	ctx->pos = round_up(ctx->pos, 4);
 
-	tag = parse_tag(ctx);
+	tag = parse_bytes(ctx, sizeof(struct os_tag));
 	if (IS_ERR(tag))
-		return PTR_ERR(ret);
+		return tag;
+	if (tag->padding)
+		return ERR_PTR(-EINVAL);
+	return tag;
+}
 
-	WARN_ON(!!tag->padding);
-	printf("Tag: %u %u %u\n", tag->last, tag->type, tag->size);
+struct os_tag *parse_tag_type(struct ctx *ctx, enum os_otype type)
+{
+	struct os_tag *tag = parse_tag(ctx);
+	if (IS_ERR(tag))
+		return tag;
+	if (tag->type != type)
+		return ERR_PTR(-EINVAL);
+	return tag;
+}
 
-	switch (tag->type) {
-	case OS_OTYPE_DICTIONARY:
-	{
-		int i;
+const char *parse_string(struct ctx *handle)
+{
+	struct os_tag *tag = parse_tag_type(handle, OS_OTYPE_STRING);
 
-		for (i = 0; i < tag->size; ++i) {
-			/* key */ parse_obj(ctx);
-			/* value */ parse_obj(ctx);
-		}
+	if (IS_ERR(tag))
+		return (void *) tag;
 
-		break;
-	}
+	return parse_bytes(handle, tag->size);
+}
 
-	case OS_OTYPE_ARRAY:
-	case OS_OTYPE_INT64:
-		printf("TODO %u!\n", tag->type);
-		return -EINVAL;
+struct dict_iterator {
+	struct ctx handle;
+	u32 idx;
+	u32 len;
+};
 
-	case OS_OTYPE_STRING:
-	{
-		const char *str = parse_bytes(ctx, tag->size);
-		printf("%s\n", str);
-		break;
-	}
+int dict_iterator_begin(struct ctx dict, struct dict_iterator *it)
+{
+	struct os_tag *tag;
 
-	case OS_OTYPE_BLOB:
-	case OS_OTYPE_BOOL:
-	default:
-		printf("TODO %u!\n", tag->type);
-		return -EINVAL;
-	}
+	*it = (struct dict_iterator) {
+		.handle = dict,
+		.idx = 0
+	};
 
+	tag = parse_tag_type(&it->handle, OS_OTYPE_DICTIONARY);
+	if (IS_ERR(tag))
+		return PTR_ERR(tag);
+
+	it->len = tag->size;
 	return 0;
+}
+
+bool dict_iterator_not_done(struct dict_iterator *it)
+{
+	return it->idx < it->len;
+}
+
+void dict_iterator_next(struct dict_iterator *it)
+{
+	it->idx++;
 }
 
 int parse(void *blob, size_t size)
@@ -129,7 +143,11 @@ int parse(void *blob, size_t size)
 	if (*header != OSSERIALIZE_HDR)
 		return -EINVAL;
 
-	parse_obj(&ctx);
+	struct dict_iterator it;
+	for (dict_iterator_begin(ctx, &it); dict_iterator_not_done(&it); dict_iterator_next(&it)) {
+		printf("%s\n", parse_string(&it.handle));
+		printf("%s\n", parse_string(&it.handle));
+	}
 
 	return 0;
 }
