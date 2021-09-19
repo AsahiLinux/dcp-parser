@@ -70,19 +70,38 @@ int parse_obj(struct ctx *ctx)
 	if (IS_ERR(tag))
 		return PTR_ERR(ret);
 
-	WARN_ON(tag->padding != 0);
-
+	WARN_ON(!!tag->padding);
 	printf("Tag: %u %u %u\n", tag->last, tag->type, tag->size);
 
 	switch (tag->type) {
 	case OS_OTYPE_DICTIONARY:
+	{
+		int i;
+
+		for (i = 0; i < tag->size; ++i) {
+			/* key */ parse_obj(ctx);
+			/* value */ parse_obj(ctx);
+		}
+
+		break;
+	}
+
 	case OS_OTYPE_ARRAY:
 	case OS_OTYPE_INT64:
+		printf("TODO %u!\n", tag->type);
+		return -EINVAL;
+
 	case OS_OTYPE_STRING:
+	{
+		const char *str = parse_bytes(ctx, tag->size);
+		printf("%s\n", str);
+		break;
+	}
+
 	case OS_OTYPE_BLOB:
 	case OS_OTYPE_BOOL:
 	default:
-		printf("TODO!\n");
+		printf("TODO %u!\n", tag->type);
 		return -EINVAL;
 	}
 
